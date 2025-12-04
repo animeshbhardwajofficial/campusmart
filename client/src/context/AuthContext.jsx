@@ -24,22 +24,23 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('token', authToken);
         localStorage.setItem('user', JSON.stringify(userData));
     };
+    
+    // NEW FUNCTION: Updates user state after a successful profile save
+    const updateUser = (newUserData) => {
+        setUser(newUserData);
+        localStorage.setItem('user', JSON.stringify(newUserData));
+    };
 
     const logout = () => {
-        // 1. Clear State
         setUser(null);
         setToken('');
-        
-        // 2. Clear Storage
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        
-        // 3. UX FIX: Redirect to Home Page (Public View) instead of Login
         window.location.href = "/"; 
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+        <AuthContext.Provider value={{ user, token, login, logout, loading, updateUser }}>
             {children}
         </AuthContext.Provider>
     );

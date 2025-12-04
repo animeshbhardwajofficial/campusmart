@@ -3,6 +3,8 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+const JWT_SECRET = process.env.JWT_SECRET || 'SUPERSECRETKEY123'; // fallback if env not set — but set env in production
+
 // REGISTER
 router.post('/register', async (req, res) => {
     try {
@@ -50,10 +52,10 @@ router.post('/login', async (req, res) => {
         const validPass = await bcrypt.compare(password, user.password);
         if (!validPass) return res.status(400).json({ message: "Invalid password" });
 
-        // 3. Create & Assign Token (This is their "Digital ID Card")
-        const token = jwt.sign({ _id: user._id }, 'SUPERSECRETKEY123', { expiresIn: '7d' });
+        // 3. Create & Assign Token
+        const token = jwt.sign({ _id: user._id }, JWT_SECRET, { expiresIn: '7d' });
         
-        // Remove password from response for security
+        // Remove password from response
         const { password: _, ...userInfo } = user._doc;
 
         res.header('auth-token', token).json({ token, user: userInfo });

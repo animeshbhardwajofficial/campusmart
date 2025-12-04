@@ -16,6 +16,7 @@ const userRoute = require("./routes/users");
 
 const app = express();
 
+// ALLOW ALL DEVICES
 app.use(cors({ origin: "*" })); 
 app.use(express.json());
 
@@ -25,7 +26,6 @@ app.use("/api/conversations", conversationRoute);
 app.use("/api/messages", messageRoute);
 app.use("/api/users", userRoute);
 
-// --- SOCKET.IO SETUP ---
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -38,7 +38,6 @@ const io = new Server(server, {
 let users = [];
 
 const addUser = (userId, socketId) => {
-    // Only add if not already present to avoid duplicates in list
     if (!users.some((user) => user.userId === userId)) {
         users.push({ userId, socketId });
     }
@@ -55,13 +54,13 @@ const getUserSockets = (userId) => {
 io.on("connection", (socket) => {
     console.log("a user connected.");
 
-    // 1. User Joins -> Broadcast "I am Online"
+    // 1. Online Status
     socket.on("addUser", (userId) => {
         addUser(userId, socket.id);
-        io.emit("getUsers", users); // Send full list of online users to everyone
+        io.emit("getUsers", users);
     });
 
-    // 2. Send Message
+    // 2. Messaging
     socket.on("sendMessage", ({ senderId, receiverId, text }) => {
         const receiverSockets = getUserSockets(receiverId);
         receiverSockets.forEach((user) => {
@@ -72,7 +71,7 @@ io.on("connection", (socket) => {
         });
     });
 
-    // 3. Typing Events (New)
+    // 3. Typing Indicators
     socket.on("typing", ({ senderId, receiverId }) => {
         const receiverSockets = getUserSockets(receiverId);
         receiverSockets.forEach((user) => {
@@ -87,7 +86,7 @@ io.on("connection", (socket) => {
         });
     });
 
-    // 4. Disconnect -> Broadcast "I am Offline"
+    // 4. Disconnect
     socket.on("disconnect", () => {
         console.log("a user disconnected!");
         removeUser(socket.id);

@@ -15,46 +15,38 @@ export default function Chat() {
   const [conversations, setConversations] = useState([]);
   const [currentChat, setCurrentChat] = useState(null);
   const [messages, setMessages] = useState([]);
-  
-  // Track WHO is typing
   const [typingUsers, setTypingUsers] = useState(new Set()); 
   const typingTimeoutRef = useRef(null);
 
-  // 1. Fetch Conversations
+  const API_URL = `http://${window.location.hostname}:5000/api`;
+
   useEffect(() => {
     const getConversations = async () => {
       try {
-        const res = await axios.get("http://10.79.66.93:5000/api/conversations/" + user._id);
+        const res = await axios.get(`${API_URL}/conversations/${user._id}`);
         setConversations(res.data);
-
         if (location.state?.conversation) {
             setCurrentChat(location.state.conversation);
             markChatAsRead(location.state.conversation._id);
         }
-      } catch (err) {
-        console.log(err);
-      }
+      } catch (err) { console.log(err); }
     };
     getConversations();
   }, [user._id, location.state, markChatAsRead]);
 
-  // 2. Fetch Messages
   useEffect(() => {
     const getMessages = async () => {
       try {
         if (currentChat) {
-            const res = await axios.get("http://10.79.66.93:5000/api/messages/" + currentChat._id);
+            const res = await axios.get(`${API_URL}/messages/${currentChat._id}`);
             setMessages(res.data);
             markChatAsRead(currentChat._id);
         }
-      } catch (err) {
-        console.log(err);
-      }
+      } catch (err) { console.log(err); }
     };
     getMessages();
   }, [currentChat, markChatAsRead]);
 
-  // 3. Socket Listeners
   useEffect(() => {
     if (!socket) return;
 
@@ -66,8 +58,6 @@ export default function Chat() {
                 createdAt: Date.now(),
             }]);
             markChatAsRead(currentChat._id);
-            
-            // Clear typing if message arrives
             setTypingUsers(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(data.senderId);
@@ -76,10 +66,7 @@ export default function Chat() {
         }
     };
 
-    const handleTyping = ({ senderId }) => {
-        setTypingUsers(prev => new Set(prev).add(senderId));
-    };
-
+    const handleTyping = ({ senderId }) => setTypingUsers(prev => new Set(prev).add(senderId));
     const handleStopTyping = ({ senderId }) => {
         setTypingUsers(prev => {
             const newSet = new Set(prev);
@@ -99,42 +86,26 @@ export default function Chat() {
     };
   }, [socket, currentChat, markChatAsRead]);
 
-  // 4. Send Message Logic
   const sendMessage = async (text) => {
-    const message = {
-      sender: user._id,
-      text: text,
-      conversationId: currentChat._id,
-    };
-
+    const message = { sender: user._id, text: text, conversationId: currentChat._id };
     const receiverId = currentChat.members.find((m) => m !== user._id);
 
     if(socket){
-        socket.emit("sendMessage", {
-          senderId: user._id,
-          receiverId,
-          text: text,
-        });
+        socket.emit("sendMessage", { senderId: user._id, receiverId, text });
         socket.emit("stopTyping", { senderId: user._id, receiverId });
     }
 
     try {
-      const res = await axios.post("http://10.79.66.93:5000/api/messages", message);
+      const res = await axios.post(`${API_URL}/messages`, message);
       setMessages(prev => [...prev, res.data]); 
-    } catch (err) {
-      console.log(err);
-    }
+    } catch (err) { console.log(err); }
   };
 
-  // 5. Handle Typing
   const handleTyping = () => {
       if(!socket || !currentChat) return;
       const receiverId = currentChat.members.find((m) => m !== user._id);
-      
       socket.emit("typing", { senderId: user._id, receiverId });
-
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      
       typingTimeoutRef.current = setTimeout(() => {
           socket.emit("stopTyping", { senderId: user._id, receiverId });
       }, 2000);
@@ -142,32 +113,12 @@ export default function Chat() {
 
   return (
     <div className="h-screen pt-16 bg-gray-50 flex overflow-hidden">
-      
       <div className={`w-full md:w-1/4 h-full border-r border-gray-200 bg-white flex flex-col ${currentChat ? 'hidden md:flex' : 'flex'}`}>
-        <ChatSidebar 
-            conversations={conversations}
-            currentChat={currentChat}
-            setCurrentChat={setCurrentChat}
-            user={user}
-            unreadChats={unreadChats}
-            typingUsers={typingUsers}
-        />
+        <ChatSidebar conversations={conversations} currentChat={currentChat} setCurrentChat={setCurrentChat} user={user} unreadChats={unreadChats} typingUsers={typingUsers} />
       </div>
-
       <div className={`w-full md:flex-1 h-full relative ${currentChat ? 'flex' : 'hidden md:flex'}`}>
-        <ChatWindow 
-            currentChat={currentChat}
-            setCurrentChat={setCurrentChat}
-            user={user}
-            messages={messages}
-            sendMessage={sendMessage}
-            navigate={navigate}
-            onType={handleTyping}
-            typingUsers={typingUsers}
-            onlineUsers={onlineUsers}
-        />
+        <ChatWindow currentChat={currentChat} setCurrentChat={setCurrentChat} user={user} messages={messages} sendMessage={sendMessage} navigate={navigate} onType={handleTyping} typingUsers={typingUsers} onlineUsers={onlineUsers} />
       </div>
-      
     </div>
   );
 }
